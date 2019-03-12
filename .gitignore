@@ -1,5 +1,6 @@
 __pycache__/
-data/
 .ipynb_checkpoints/
 .DSstore
-*.rpm
+*.json
+*.log
+*.txt
