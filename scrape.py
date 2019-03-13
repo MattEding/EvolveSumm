@@ -32,7 +32,7 @@ with open(robots_txt) as fp:
 
 def delay(seconds, lam=1.0):
     duration = seconds + np.random.rand() + np.random.poisson(lam=lam)
-    time.sleep(duration / 4)
+    time.sleep(duration / 33)
 
 
 def get_pages(dates, *, seconds=3):
