@@ -1,0 +1,21 @@
+Can I use context managers to avoid passing common parameters to functions/classes?
+
+with context_X_y(X_train, y_train):
+    est = Estimator()
+    est.fit() # params auto passed
+    
+    
+    
+https://www.youtube.com/watch?v=05ONoGfmKvA
+NLTK
+- nltk.ne_chunk --> use with pos tags to get named entity recognition
+- FreqDist
+- nltk.token.blanktokenizer: paragrahs
+- nltk.stem[.stemming] --> porter, lancadster, snowball
+- nltk.stem[.lemmatize] --> need to get pos tags first
+- syntax tree - ghostscript
+- nltk.RegexParser(r"grammar")
+
+
+look for top/common words of the news articles to determine stopwords. 
+may even use clustering and time series to influence stopwords`
