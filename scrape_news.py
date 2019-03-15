@@ -1,7 +1,6 @@
 import itertools
 import json
 import logging
-import os
 import pathlib
 import time
 
@@ -21,18 +20,18 @@ with open(robots_txt) as fp:
         if 'User-agent: *' in line:
             break
 
-    robot_disallow = []
+    ROBOTS_DISALLOW = []
     for line in lines:
         if 'User-agent:' in line:
             break
         _, disallow = line.split(':')
         disallow = disallow.strip().split('*')[-1]
-        robot_disallow.append(disallow)
+        ROBOTS_DISALLOW.append(disallow)
 
 
 def delay(seconds, lam=1.0):
     duration = seconds + np.random.rand() + np.random.poisson(lam=lam)
-    time.sleep(duration / 33)
+    time.sleep(duration)
 
 
 def get_pages(dates, *, seconds=3):
@@ -64,7 +63,7 @@ def get_info(article, *, seconds=3):
     date, summary = teaser.text.split('\x95')
 
     link = article.h2.a['href']
-    if any(disallow in link for disallow in robot_disallow):
+    if any(disallow in link for disallow in ROBOTS_DISALLOW):
         return
     resp = requests.get(link)
 
@@ -139,6 +138,5 @@ if __name__ == '__main__':
             jsons.clear()
     except Exception as exc:
         logging.exception('*** MAIN ERROR ***')
-        os.system(f'say "{type(exc)} {date.date()}"')
 
     logging.info(f'FINISHED {start} to {end}')
