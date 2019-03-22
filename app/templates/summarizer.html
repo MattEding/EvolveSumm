@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <title>Evolutionary Summarizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+
+  <body>
+    <p>Parameters:</p>
+
+    <form>
+        Population Size:
+        <input type="number" name="pop" min="50" max="500" step="50" value="100" required>
+
+        <br>
+        Summary Length:
+        <input type="number" name="summ" min="1" value="3" required>
+
+        <br>
+        Generations:
+        <input type="number" name="gens" min="100" max="1000" step="100" value="500" required>
+
+        <br>
+        Crossover Rate:
+        <input type="number" name="cross" min="0" max="1" step="0.1" value="0.5" required>
+
+        <br>
+        Scale Factor:
+        <input type="number" name="scale" min="0" max="1" step="0.1" value="0.5" required>
+
+        <br>
+        Fitness Function:
+        <select name="fitness" required>
+          <option value="coh_sep">Cohesion & Separation</option>
+          <option value="coh">Cohesion</option>
+          <option value="sep">Separation</option>
+        </select>
+
+        <br>
+        Similarity Metric:
+        <select name="similarity" required disabled>
+          <option value="jaccard">Jaccard Similarity</option>
+        </select>
+
+        <br>
+        <input type="submit" name="submit" value="Summarize">
+
+    </form>
+
+
+    <textarea required rows="10" name="txt_in" placeholder="Enter text to summarize.">{{ txt_in }}</textarea>
+
+    <textarea required rows="10" name="txt_out" readonly placeholder="Summary output.">{{ txt_out }}</textarea>
+
+  </body>
+</html>
