@@ -1,18 +1,8 @@
-import functools
 import itertools
 import logging
 import multiprocessing
-import pathlib
 
-import numba
 import numpy as np
-
-from nltk import tokenize
-from nltk.util import ngrams
-
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics.pairwise import cosine_distances
-from sklearn.metrics import pairwise_distances
 
 import similarity
 

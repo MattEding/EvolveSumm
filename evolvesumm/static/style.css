@@ -1,0 +1,50 @@
+body {
+  background-image: url("http://birtansogutma.com/wp-content/uploads/2019/02/light-wood-texture-simple-ideas-table-top-grain-wallmaya-1920-1200-for-prepare-8.jpg");
+  opacity: 0.75;
+}
+
+h1 {
+  font-family: verdana;
+  font-size: 30px;
+  text-align: center;
+  text-decoration: underline;
+}
+
+form {
+  font-family: verdana;
+  font-size: 18px;
+}
+
+label {
+  display: inline-block;
+  float: left;
+  clear: left;
+  width: 250px;
+  text-align: right;
+}
+
+input {
+  display: inline-block;
+  float: left;
+}
+
+select {
+  display: inline-block;
+  float: left;
+}
+
+textarea {
+  width: 100%;
+  border: 2px solid #393736;
+  border-radius: 6px;
+  font-size: 14px;
+  resize: none;
+}
+
+select {
+  font-size: 16px;
+}
+
+input {
+  font-size: 14px;
+}

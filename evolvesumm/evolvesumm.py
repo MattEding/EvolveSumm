@@ -4,6 +4,8 @@ import itertools
 from nltk import tokenize
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_distances
+# from sklearn.metrics import pairwise_distances
+
 
 import dde
 import similarity
@@ -35,5 +37,4 @@ def evolesumm(text, summary_length=0.1, population_size=100, iterations=1000, la
                     verbose=verbose, seed=None)
 
     summ = dde.construct_summary(best, doc, text, sents_lower, distance, fitness2)
-    print(f'\n{summ}\n')
     return summ
