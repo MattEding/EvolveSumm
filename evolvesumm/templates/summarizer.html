@@ -31,17 +31,20 @@
 
         <br>
         Fitness Function:
-        <select name="fitness" required>
+        <select name="fit" required>
           <option value="coh_sep">Cohesion & Separation</option>
-          <option value="coh">Cohesion</option>
-          <option value="sep">Separation</option>
+          <option value="cohesion">Cohesion</option>
+          <option value="separation">Separation</option>
         </select>
 
         <br>
         Similarity Metric:
-        <select name="similarity" required disabled>
+        <select name="sim" required>
           <option value="jaccard">Jaccard Similarity</option>
         </select>
+
+        <br>
+        <textarea required rows="10" name="txt_in" placeholder="Enter text to summarize.">{{ txt_in }}</textarea>
 
         <br>
         <input type="submit" name="submit" value="Summarize">
@@ -49,7 +52,7 @@
     </form>
 
 
-    <textarea required rows="10" name="txt_in" placeholder="Enter text to summarize.">{{ txt_in }}</textarea>
+
 
     <textarea required rows="10" name="txt_out" readonly placeholder="Summary output.">{{ txt_out }}</textarea>
 

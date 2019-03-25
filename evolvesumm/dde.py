@@ -68,13 +68,13 @@ def mutate(population, randoms):
 
 
 def iterate_gerations(population_size, summary_length, sentence_count, fitness,
-                      lamba_, crossover_rate, iterations):
+                      lambda_, crossover_rate, iterations):
     pool = multiprocessing.Pool()
     pop = init_population(population_size, summary_length, sentence_count)
     shape = pop.shape
     for i in range(iterations):
         rand = np.random.random_sample(shape)
-        offspr = get_offspring(pop, rand, lamba_, crossover_rate)
+        offspr = get_offspring(pop, rand, lambda_, crossover_rate)
         next_generation(pop, offspr, fitness, pool)
         mutate(pop, rand)
         yield pop
@@ -117,12 +117,12 @@ def construct_summary(population, document, orig_text, tokens, metric, fitness):
     return summ
 
 
-def main(population_size, summary_length, sentence_count, fitness, lamba_,
+def main(population_size, summary_length, sentence_count, fitness, lambda_,
          crossover_rate, iterations, *, seed=None, verbose=False):
 
     if verbose:
         logging.info(f'population_size={population_size}, summary_length={summary_length},'
-                     f'fitness={fitness}, lamba_={lamba_}, crossover_rate={crossover_rate},'
+                     f'fitness={fitness}, lambda_={lambda_}, crossover_rate={crossover_rate},'
                      f'iterations={iterations}, seed={seed}')
 
     if seed is not None:
@@ -139,10 +139,9 @@ def main(population_size, summary_length, sentence_count, fitness, lamba_,
         raise TypeError('summary_length must be a float or int')
 
     for i, generation in enumerate(iterate_gerations(population_size, summary_length,
-                                                     sentence_count, fitness, lamba_,
+                                                     sentence_count, fitness, lambda_,
                                                      crossover_rate, iterations)):
         if verbose:
             logging.info(f'iteration: {i}')
 
-    # summ = construct_summary(generation, document, orig_text, tokens, )
     return generation
