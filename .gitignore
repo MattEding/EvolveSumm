@@ -2,6 +2,5 @@ __pycache__/
 .ipynb_checkpoints/
 .DSstore
 data/
-*.json
 *.log
 *.tar.*
