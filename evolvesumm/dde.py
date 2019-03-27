@@ -12,6 +12,7 @@ def init_chromosome(choices, length):
     #: ensure that each choice is accounted for at least once
     idxs = np.random.choice(np.arange(length), len(choices), replace=False)
     chrom[idxs] = np.random.permutation(choices)
+    #TODO: can i just do `chrom == -1` and then choices(choices, sum(idxs))?
     idxs = np.where(chrom == -1)[0]
     chrom[idxs] = np.random.choice(choices, len(idxs))
     return chrom
