@@ -6,12 +6,80 @@ from nltk.tokenize import sent_tokenize
 from numba import njit
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics import pairwise_distances
+from sklearn.utils import check_random_state
 
 from utils import jaccard, sigmoid
 
 
 class DdeSummarizer:
-    def __init__(self, pop_size=100, max_iter=1000, summ_ratio=0.1, lam=0.5, crossover=0.5, fitness='coh_sep', n_jobs=1, early_stopping=False, n_iter_no_change=5, tol=1e-3, random_state=None, verbose=0, similarity=jaccard, stop_words=None, tokenizer=sent_tokenize):
+    """Discrete differential evolution (DDE) extractive text summarizer.
+
+    Parameters
+    ----------
+    pop_size : int, (default=1000)
+        The population size to create offspring and mutate over.
+
+    max_iter : int, (default=1000)
+        The maximum number of generations to evolve.
+
+    summ_ratio : float, (default=0.1)
+        The compression ratio for the summary, with 0 <= summ_ratio <= 1.
+
+    lam : float, (default=0.5)
+        The scale factor used with DDE, with 0 <= lam <= 1.
+
+    crossover : float, (default=0.5)
+        The crossover rate used for offspring, with 0 <= summ_ratio <= 1.
+
+    fitness : str, 'coh_sep', 'coh', or 'sep', (default='coh_sep')
+        The fitness function used to determine which chromosomes make it to the
+        next generation. The 'coh' fitness maximizes similarity within a given
+        cluster. The 'sep' fitness minimizes similarity between different
+        clusters. The 'coh_sep' is a balance of the former two.
+
+    similarity : callable, (default=jaccard)
+        Similarity function for comparing two arrays. Needs to be able to work
+        with numba.
+
+    metric : str, or callable, (default='cosine')
+        Metric used to select central sentences from clusters when finished with
+        iterating through generations.
+        See sklearn.metrics.pairwise_distances for details.
+
+    tokenizer : callable, (default=nltk.tokenize.sent_tokenize)
+        Tokenizer used to split text when fit.
+
+    stop_words : str, list, or None (default=None):
+        Words to remove from document.
+        See sklearn.feature_extraction.text.CountVectorizer for details.
+
+    n_jobs : int, (default=1)
+        The number of CPUs to score fitness of each chromosome in the population
+        at each generation. -1 means usings all processors.
+
+    early_stopping : bool, (default=False)
+        Whether to use early stopping to terminate iterations when fitness score
+        is not improving.
+
+    n_iter_no_change : int, (default=5)
+        Number of iterations with no improvement to wait before early stopping.
+
+    tol : float, (default=1e-3)
+        The stopping criterion.
+
+    random_state : int, (default=None)
+        The seed of the pseudo random number generator to use when evolving To
+        be passed to np.random.seed.
+
+    verbose : int, (default=0)
+        The verbosity level.
+    """
+
+    def __init__(self, pop_size=100, max_iter=1000, summ_ratio=0.1, lam=0.5, crossover=0.5,
+                 fitness='coh_sep', similarity=jaccard, metric='cosine', tokenizer=sent_tokenize,
+                 stop_words=None, n_jobs=1, early_stopping=False, n_iter_no_change=5,
+                 tol=1e-3, random_state=None, verbose=0):
 
         self.max_iter = int(max_iter)
         self.n_jobs = int(n_jobs) # if negative -> use all cores
@@ -22,6 +90,7 @@ class DdeSummarizer:
         self.verbose = max(0, int(verbose))
         self.stop_words = stop_words
         self.tokenizer = tokenizer
+        self.metric = str(metric).lower()
 
         self._pop = None
         self._offspr = None
@@ -62,32 +131,19 @@ class DdeSummarizer:
         self.text = str(text)
         self._tokens = self.tokenizer(self.text.lower())
         count_vec = CountVectorizer(stop_words=self.stop_words).fit_transform(self._tokens)
+        #: numba does not support sparse matrices
         self._document = count_vec.toarray().astype(bool)
         self._summ_len = int(self.summ_ratio * self._document.shape[1]) or 1
 
-    @property
-    def n_iter_(self):
-        ...
-
-    @property
-    def best_chrom_(self):
-        ...
-
-    @property
-    def summary_(self):
-        ...
-
     def summarize(self):
-        if isinstance(self.random_state, int):
-            np.random.seed(self.random_state)
-        elif isinstance(self.random_state, tuple):
-            np.random.set_state(self.random_state)
+        np.random.seed(self.random_state)
 
         if self.verbose:
-            if self.random_state is None:
-                logging.debug('random state: {}'.format(np.random.get_state()))
-            else:
-                logging.debug('random state: {}'.format(self.random_state))
+            logging.debug(repr(self))
+            logging.info(self.text)
+            logging.debug('random seed: {}'.format(self.random_state))
+            if self.verbose >= 2:
+                logging.info('random state: {}'.format(np.random.get_state()))
 
         processes = self.n_jobs if (self.n_jobs >= 1) else None
         self._pool = multiprocessing.Pool(processes)
@@ -95,6 +151,7 @@ class DdeSummarizer:
 
         n_iter = collections.deque([np.nan] * self.n_iter_no_change, maxlen=self.n_iter_no_change)
         for i in range(self.max_iter):
+            self._rand = np.random.random_sample(self._pop.shape)
             next(self)
             if self.verbose:
                 logging.debug('iteration: {}'.format(i))
@@ -108,7 +165,7 @@ class DdeSummarizer:
 
         self._pool.terminate()
         self.n_iter_ = i + 1
-        #TODO: this skips mutate?
+        #TODO: this skips mutate step?
         self.best_chrom_ = self._best_fit
 
     def _init_chrom(self):
@@ -150,6 +207,27 @@ class DdeSummarizer:
         sorter = np.lexsort((-arr[1], arr[0]))
         rev = arr.T[sorter].T
         self._pop[idxs] = self._pop[(rev[0], rev[1])]
+        return
+
+    def _central_sents(self):
+        central_idxs = []
+        for cluster in np.unique(self.best_chrom_):
+            idxs = np.where(self.best_chrom_ == cluster)[0]
+            sents = self._document[idxs]
+            centroid = sents.mean(axis=0)[np.newaxis,:]
+            dists = pairwise_distances(sents, centroid, self.metric)
+            cent_sent = idxs[np.argmin(dists)]
+            central_idxs.append(cent_sent)
+        return sorted(central_idxs)
+
+    def _build_summ(self):
+        central = self._central_sents()
+        summ = []
+        for sent in np.array(self._tokens)[central]:
+            start = self.text.lower().index(sent)
+            stop = start + len(sent)
+            summ.append(self.text[start:stop])
+        self.summary_ = '\n'.join(summ)
         return
 
     @njit
