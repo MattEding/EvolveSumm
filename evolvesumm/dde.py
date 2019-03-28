@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics import pairwise_distances
 
-from utils import jaccard, sigmoid, cohesion, separation, cohesion_separation
+from .utils import jaccard, sigmoid, cohesion, separation, cohesion_separation
 
 
 class DdeSummarizer:

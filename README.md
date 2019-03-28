@@ -1,5 +1,9 @@
-```python
->>> import dde
+A discrete differential evolutionary (DDE) extractive text summarizer. It has a stochastic nature, so if a summary is not to your liking, you can redo it for variation.
+
+Using 10% summaries of DUC 2001 dataset, DDE performed on par with TextRank (implementations from both gensim and sumy) and better than LexRank (sumy implementation) using ROUGE-1, 2, 3 metrics.
+
+```
+>>> from evolvesumm import dde
 >>> with open('tell_tale_heart.txt') as fp:
         text = fp.read()
 >>> dde_summ = DdeSummarizer(pop_size=50, max_iter=500, summ_ratio=0.05, stop_words='english',
