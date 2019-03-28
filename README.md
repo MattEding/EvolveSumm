@@ -6,7 +6,7 @@ Using 10% summaries of DUC 2001 dataset, DDE performed on par with TextRank (imp
 >>> from evolvesumm import dde
 >>> with open('tell_tale_heart.txt') as fp:
         text = fp.read()
->>> dde_summ = DdeSummarizer(pop_size=50, max_iter=500, summ_ratio=0.05, stop_words='english',
+>>> dde_summ = dde.DdeSummarizer(pop_size=50, max_iter=500, summ_ratio=0.05, stop_words='english',
                              n_jobs=-1, random_state=0) # 5% summary length
 >>> dde_sum.fit(text)
 >>> dde_sum.summarize()
