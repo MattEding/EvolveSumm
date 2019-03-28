@@ -1,0 +1,4 @@
+nltk
+numba
+numpy
+scikit-learn
