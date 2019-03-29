@@ -108,7 +108,6 @@ class DdeSummarizer:
         self.stop_words = stop_words
         self.tokenizer = tokenizer
         self.metric = str(metric).lower()
-
         self._pop = None
         self._offspr = None
         self._rand = None
@@ -147,7 +146,7 @@ class DdeSummarizer:
         self.text = str(text)
         self._tokens = self.tokenizer(self.text.lower())
         count_vec = CountVectorizer(stop_words=self.stop_words).fit_transform(self._tokens)
-        #: numba does not support sparse matrices
+        #: numba does not support sparse matrices; dtype bool to emulate sets
         self._document = count_vec.toarray().astype(bool)
         self._summ_len = int(self.summ_ratio * self._document.shape[1]) or 1
 
@@ -156,17 +155,18 @@ class DdeSummarizer:
         np.random.seed(self.random_state)
 
         if self.verbose:
-            logging.debug(repr(self))
-            logging.info(self.text)
-            logging.debug('random seed: {}'.format(self.random_state))
+            logging.info(repr(self))
+            logging.debug(self.text)
+            logging.info('random seed: {}'.format(self.random_state))
             if self.verbose >= 2:
-                logging.info('random state: {}'.format(np.random.get_state()))
+                logging.debug('random state: {}'.format(np.random.get_state()))
 
         processes = self.n_jobs if (self.n_jobs >= 1) else None
         pool = multiprocessing.Pool(processes)
         n_iter_deque = collections.deque([np.nan] * self.n_iter_no_change, maxlen=self.n_iter_no_change)
         self._pop = np.array([self._init_chrom() for _ in range(self.pop_size)])
 
+        #: iterate through generations to approach optimal solution
         for i in range(self.max_iter):
             self._rand = np.random.random_sample(self._pop.shape)
             self._offspring()
@@ -174,10 +174,11 @@ class DdeSummarizer:
             self._mutate()
 
             if self.verbose:
-                logging.debug('iteration: {}'.format(i))
+                logging.info('iteration: {}'.format(i))
                 if self.verbose >= 2:
-                    logging.debug('best fit: {}'.format(self._best_fit))
+                    logging.info('best fit: {}'.format(self._best_fit))
 
+            #TODO: regularize fitness scores since it depends on length of document
             if self.early_stopping:
                 n_iter_deque.append(self._best_fit)
                 if max(n_iter_deque) - min(n_iter_deque) < self.tol:
@@ -190,6 +191,7 @@ class DdeSummarizer:
         self._build_summ()
 
     def _init_chrom(self):
+        #: make a chromosome that is a random partition with each cluster.
         clusters = np.arange(self._summ_len)
         chrom = np.full(len(self._document), -1)
         #: ensure that each cluster is accounted for at least once
@@ -201,6 +203,7 @@ class DdeSummarizer:
         return chrom
 
     def _offspring(self):
+        #: create offspring using parent population
         n = np.arange(len(self._pop))
         s = frozenset(n)
         #: get 3 distinct chromosomes that differ from i_th chromosome
@@ -213,6 +216,7 @@ class DdeSummarizer:
         return
 
     def _survival(self, pool):
+        #: determine whether parents or offspring will survive to the next generation
         fits = pool.map(self.fitness, itertools.chain(self._pop, self._offspr))
         self._best_fit = max(fits)  # used for early stopping
         i = len(self._pop)
@@ -231,19 +235,21 @@ class DdeSummarizer:
         self._pop[idxs] = self._pop[(rev[0], rev[1])]
         return
 
-    def _central_sents(self):
+    def _central_tokens(self):
+        #: find centroid for each cluster and choose best representative token
         central_idxs = []
         for cluster in np.unique(self.best_chrom_):
             idxs = np.where(self.best_chrom_ == cluster)[0]
-            sents = self._document[idxs]
-            centroid = sents.mean(axis=0)[np.newaxis,:]
-            dists = pairwise_distances(sents, centroid, self.metric)
-            cent_sent = idxs[np.argmin(dists)]
-            central_idxs.append(cent_sent)
+            tokens = self._document[idxs]
+            centroid = tokens.mean(axis=0)[np.newaxis,:]
+            dists = pairwise_distances(tokens, centroid, self.metric)
+            central_token = idxs[np.argmin(dists)]
+            central_idxs.append(central_token)
         return sorted(central_idxs)
 
     def _build_summ(self):
-        central = self._central_sents()
+        #: build summary with preserved upper and lower case
+        central = self._central_tokens()
         summ = []
         for sent in np.array(self._tokens)[central]:
             start = self.text.lower().index(sent)
