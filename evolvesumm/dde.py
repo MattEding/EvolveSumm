@@ -79,6 +79,17 @@ class DdeSummarizer:
 
     verbose : int, (default=0)
         The verbosity level.
+
+    Attributes
+    ----------
+    summary_ : str
+        The extracted summary.
+
+    best_chrom_ : array, shape (n_tokens,)
+        Assigned clusters for each token the text was split into.
+
+    n_iter_ : int
+        The actual number of iterations executed.
     """
 
     def __init__(self, pop_size=100, max_iter=1000, summ_ratio=0.1, lam=0.5, crossover=0.5,
