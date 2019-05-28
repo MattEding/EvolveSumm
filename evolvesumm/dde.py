@@ -202,13 +202,17 @@ class DdeSummarizer:
         chrom[idxs] = np.random.choice(clusters, np.sum(idxs))
         return chrom
 
-    def _create_offspring(self):
+    def _get_distinct_chromosomes(self):
         #: create offspring using parent population
         n = np.arange(len(self._pop))
         s = frozenset(n)
         #: get 3 distinct chromosomes that differ from i_th chromosome
         idxs = np.array([np.random.choice(tuple(s - {i}), size=3, replace=False) for i in n])
         chrom_1, chrom_2, chrom_3 = map(np.squeeze, np.split(self._pop[idxs], 3, axis=1))
+        return chrom_1, chrom_2, chrom_3
+
+    def _create_offspring(self):
+        chrom_1, chrom_2, chrom_3 = self._get_distinct_chromosomes()
         #: discrete differential evolution
         self._offspr = (chrom_1 + self.lam * (chrom_2 - chrom_3)) % self._summ_len
         mask = self._rand < self.crossover
@@ -225,14 +229,19 @@ class DdeSummarizer:
         self._pop[mask] = self._offspr[mask]
         return
 
-    def _mutate(self):
-        mask = self._rand < sigmoid(self._pop)
+    @staticmethod
+    def _chromosomal_inversion(mask, pop):
         #: inversion operator -> for each row reverse order of all True values
         idxs = np.nonzero(mask)
         arr = np.array(idxs)
         sorter = np.lexsort((-arr[1], arr[0]))
         rev = arr.T[sorter].T
-        self._pop[idxs] = self._pop[(rev[0], rev[1])]
+        pop[idxs] = pop[(rev[0], rev[1])]
+        return pop
+
+    def _mutate(self):
+        mask = self._rand < sigmoid(self._pop)
+        self._pop = self._chromosomal_inversion(mask, self._pop)
         return
 
     def _central_tokens(self):
