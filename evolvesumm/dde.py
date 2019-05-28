@@ -164,12 +164,12 @@ class DdeSummarizer:
         processes = self.n_jobs if (self.n_jobs >= 1) else None
         pool = multiprocessing.Pool(processes)
         n_iter_deque = collections.deque([np.nan] * self.n_iter_no_change, maxlen=self.n_iter_no_change)
-        self._pop = np.array([self._init_chrom() for _ in range(self.pop_size)])
+        self._pop = np.array([self._initialize_chromosome() for _ in range(self.pop_size)])
 
         #: iterate through generations to approach optimal solution
         for i in range(self.max_iter):
             self._rand = np.random.random_sample(self._pop.shape)
-            self._offspring()
+            self._create_offspring()
             self._survival(pool)
             self._mutate()
 
@@ -188,9 +188,9 @@ class DdeSummarizer:
         self.n_iter_ = i + 1
         idx = np.argmax([self.fitness(chrom) for chrom in self._pop])
         self.best_chrom_ = self._pop[idx]
-        self._build_summ()
+        self._build_summary()
 
-    def _init_chrom(self):
+    def _initialize_chromosome(self):
         #: make a chromosome that is a random partition with each cluster.
         clusters = np.arange(self._summ_len)
         chrom = np.full(len(self._document), -1)
@@ -202,7 +202,7 @@ class DdeSummarizer:
         chrom[idxs] = np.random.choice(clusters, np.sum(idxs))
         return chrom
 
-    def _offspring(self):
+    def _create_offspring(self):
         #: create offspring using parent population
         n = np.arange(len(self._pop))
         s = frozenset(n)
@@ -247,7 +247,7 @@ class DdeSummarizer:
             central_idxs.append(central_token)
         return sorted(central_idxs)
 
-    def _build_summ(self):
+    def _build_summary(self):
         #: build summary with preserved upper and lower case
         central = self._central_tokens()
         summ = []

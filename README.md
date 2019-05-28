@@ -3,13 +3,13 @@ A discrete differential evolutionary (DDE) extractive text summarizer. It has a 
 Using 10% summaries of DUC 2001 dataset, DDE performed on par with TextRank (implementations from both gensim and sumy) and better than LexRank (sumy implementation) using ROUGE-1, 2, 3 metrics.
 
 ```
->>> from evolvesumm import dde
+>>> import evolvesumm
 >>> with open('tell_tale_heart.txt') as fp:
         text = fp.read()
->>> dde_summ = dde.DdeSummarizer(pop_size=50, max_iter=500, summ_ratio=0.05, stop_words='english',
-                             n_jobs=-1, random_state=0) # 5% summary length
->>> dde_sum.fit(text)
->>> dde_sum.summarize()
+>>> dde_summ = evolvesumm.DdeSummarizer(pop_size=50, max_iter=500, summ_ratio=0.05, 
+                                        stop_words='english', n_jobs=-1, random_state=0)
+>>> dde_summ.fit(text)
+>>> dde_summ.summarize()
 >>> print(dde_summ.summary_)
 Whenever it fell upon me, my blood ran cold; and so by degrees --very gradually --I made up my mind to take the life of the old man, and thus rid myself of the eye forever.
 I was never kinder to the old man than during the whole week before I killed him.
