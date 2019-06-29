@@ -57,7 +57,7 @@ cdef double _cohesion(int[::1] chrom, int[:, ::1] doc) nogil:
 
     cdef:
         double total = 0.0
-        int i, j, k, p, cluster, length = len(chrom), 
+        int i, j, k, cluster, length = len(chrom), 
         int[::1] sent
         int_vec_t sents
         int_vec_map_t sent_map
@@ -71,19 +71,19 @@ cdef double _cohesion(int[::1] chrom, int[:, ::1] doc) nogil:
         sents = pair.second
         k = sents.size()
         #: itertools.combinations(sents, r=2)
-        for i in prange(k-1, nogil=True):
+        for i in prange(k-1):
             for j in range(i+1, k):
                 total += _jaccard_similarity(sents[i], sents[j]) / k
     return total
 
 
 def cohesion(chrom, doc):
-    return _cohesion_map(chrom, doc)
+    return _cohesion(chrom, doc)
 
 
 @boundscheck(False)
 @wraparound(False)
-def separation(cnp.ndarray chrom, cnp.ndarray doc):
+cdef double _separation_map(int[::1] chrom, int[:, ::1] doc) nogil:
     """Measure of how separable all the clusters are.
 
     k-1     k                 sim(Si, Sj)
@@ -92,36 +92,39 @@ def separation(cnp.ndarray chrom, cnp.ndarray doc):
     """
 
     cdef:
-        double total = 0
-        int i, j, k = len(np.unique(chrom)), m, n, p, q = len(np.unique(chrom))
-        int[:, ::1] sents_p, sents_q
+        double total = 0.0
+        int i, j, k, m, n, p, q, cluster, length = len(chrom)
+        int[::1] sent
+        int_vec_t sents_p, sents_q
+        int_vec_map_t sent_map
+
+    for i in range(length):
+        cluster = chrom[i]
+        sent = doc[i]
+        sent_map[cluster].push_back(sent)
     
-    #: itertools.combinations(k, r=2)
+    k = sent_map.size()
     for p in range(k-1):
         for q in range(p+1, k):
-            sents_p = doc[chrom == p]
-            sents_q = doc[chrom == q]
-            #: itertools.product(sents_p, sents_q)
-            m, n = len(sents_p), len(sents_q)
-            for i in prange(m, nogil=True):
+            sents_p = sent_map[p]
+            sents_q = sent_map[q]
+            m = sents_p.size()
+            n = sents_q.size()
+            for i in range(m):
                 for j in range(n):
                     total += _jaccard_similarity(sents_p[i], sents_q[j]) / m / n
     return total
 
 
-def cohesion_separation(cnp.ndarray chrom, cnp.ndarray doc):
-    """Measure balancing both cohesion and separation of clusters."""
-    cdef double coh, sep
-    coh = cohesion(chrom, doc)
-    sep = separation(chrom, doc)
-    return (1 + _sigmoid(coh)) ** sep
+def separation(chrom, doc):
+    return _separation(chrom, doc)
 
 
-def cohesion_separation_map(cnp.ndarray chrom, cnp.ndarray doc):
+def cohesion_separation(chrom, doc):
     """Measure balancing both cohesion and separation of clusters."""
     cdef double coh, sep
     coh = _cohesion(chrom, doc)
-    sep = separation(chrom, doc)
+    sep = _separation(chrom, doc)
     return (1 + _sigmoid(coh)) ** sep
 
 
@@ -134,12 +137,10 @@ def cohesion_separation_map(cnp.ndarray chrom, cnp.ndarray doc):
 #           at least the int version is 4x faster than my numba version! :D
 #           have to manually cast doc from bool to int32
 #
-# GOAL: parallelize the multiprocessing 
-#           use pointers on flatten versions of array and keep track of row lengths
-#           for doc[chrom == k] can loop thru memoryview once and store clusters in mapping
-#               is there a defaultdict(list) for c/c++?
-#               want to store as map[cluster].append(sentence index)
-#               **ptr to do the trick?
+# TODO: 
+#   - use fuse types on chromosomes
+#   - manage sparse matrices properly
+#   - change DDE _survival to take advantage of nogil
 
 from nltk.tokenize import sent_tokenize
 import numpy as np
@@ -174,6 +175,6 @@ def get_chromosome(document):
 with open('/Users/matteding/Desktop/Metis/EvolveSumm/poe.txt') as fp:
     text = fp.read()
 
-np.random.seed(0)
+np.random.seed(1)
 doc = get_document(text).astype(np.int32)
-chrom = get_chromosome(doc)
+chrom = get_chromosome(doc).astype(np.int32)
