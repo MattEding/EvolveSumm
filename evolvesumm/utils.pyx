@@ -1,6 +1,5 @@
 import numpy as np
 
-cimport numpy as cnp
 from cython cimport boundscheck, wraparound
 from cython.parallel cimport prange
 from libc.math cimport exp
@@ -11,10 +10,15 @@ from libcpp.vector cimport vector
 ctypedef vector[int[::1]] int_vec_t
 ctypedef unordered_map[int, int_vec_t] int_vec_map_t
 
+ctypedef int[::1] chrom_t
+
+ctypedef int[:, ::1] doc_t
+ctypedef int[::1] sent_t # same type as doc; just 1D
+
 
 @boundscheck(False)
 @wraparound(False)
-cdef double _jaccard_similarity(int[::1] a, int[::1] b) nogil:
+cdef inline double _jaccard_similarity(sent_t a, sent_t b) nogil:
     """Return the ratio of the intersection to the union of two containers.
 
     | a ∩ b |
@@ -34,11 +38,6 @@ cdef double _jaccard_similarity(int[::1] a, int[::1] b) nogil:
     return ratio
 
 
-# for cython ... can probaby nix this
-cdef double _sigmoid(double x):
-    return 1 / (1 + exp(-x))
-
-
 # for numpy broadcasting
 def sigmoid(x):
     """Sigmoid function defined as 1 / (1 + exp(-x))."""
@@ -47,18 +46,11 @@ def sigmoid(x):
 
 @boundscheck(False)
 @wraparound(False)
-cdef double _cohesion(int[::1] chrom, int[:, ::1] doc) nogil:
-    """Measure of how compact all the clusters are.
-
-     k            sim(Si, Sj)
-     ∑      ∑     ———————————
-    p=1  Si,Sj∈Cp    |Cp|
-    """
-
+cdef inline double _cohesion(chrom_t chrom, doc_t doc) nogil:
     cdef:
         double total = 0.0
         int i, j, k, cluster, length = len(chrom), 
-        int[::1] sent
+        sent_t sent
         int_vec_t sents
         int_vec_map_t sent_map
 
@@ -71,30 +63,29 @@ cdef double _cohesion(int[::1] chrom, int[:, ::1] doc) nogil:
         sents = pair.second
         k = sents.size()
         #: itertools.combinations(sents, r=2)
-        for i in prange(k-1):
-            for j in range(i+1, k):
+        for i in prange(k - 1):
+            for j in range(i + 1, k):
                 total += _jaccard_similarity(sents[i], sents[j]) / k
     return total
 
 
 def cohesion(chrom, doc):
+    """Measure of how compact all the clusters are.
+
+     k            sim(Si, Sj)
+     ∑      ∑     ———————————
+    p=1  Si,Sj∈Cp    |Cp|
+    """
     return _cohesion(chrom, doc)
 
 
 @boundscheck(False)
 @wraparound(False)
-cdef double _separation_map(int[::1] chrom, int[:, ::1] doc) nogil:
-    """Measure of how separable all the clusters are.
-
-    k-1     k                 sim(Si, Sj)
-     ∑      ∑      ∑      ∑   ———————————
-    p=1   q=p+1  Si∈Cp  Sj∈Cq  |Cp|·|Cp|
-    """
-
+cdef inline double _separation(chrom_t chrom, doc_t doc) nogil:
     cdef:
         double total = 0.0
         int i, j, k, m, n, p, q, cluster, length = len(chrom)
-        int[::1] sent
+        sent_t sent
         int_vec_t sents_p, sents_q
         int_vec_map_t sent_map
 
@@ -104,12 +95,14 @@ cdef double _separation_map(int[::1] chrom, int[:, ::1] doc) nogil:
         sent_map[cluster].push_back(sent)
     
     k = sent_map.size()
-    for p in range(k-1):
-        for q in range(p+1, k):
+    #: itertools.combinations(k, r=2)
+    for p in range(k - 1):
+        for q in range(p + 1, k):
             sents_p = sent_map[p]
             sents_q = sent_map[q]
             m = sents_p.size()
             n = sents_q.size()
+            #: itertools.product(sents_p, sents_q)
             for i in range(m):
                 for j in range(n):
                     total += _jaccard_similarity(sents_p[i], sents_q[j]) / m / n
@@ -117,15 +110,29 @@ cdef double _separation_map(int[::1] chrom, int[:, ::1] doc) nogil:
 
 
 def separation(chrom, doc):
+    """Measure of how separable all the clusters are.
+
+    k-1     k                 sim(Si, Sj)
+     ∑      ∑      ∑      ∑   ———————————
+    p=1   q=p+1  Si∈Cp  Sj∈Cq  |Cp|·|Cp|
+    """
     return _separation(chrom, doc)
 
 
-def cohesion_separation(chrom, doc):
-    """Measure balancing both cohesion and separation of clusters."""
+cdef inline double _sigmoid(double x) nogil:
+    return 1 / (1 + exp(-x))
+
+
+cdef double _cohesion_separation(chrom_t chrom, doc_t doc) nogil:
     cdef double coh, sep
     coh = _cohesion(chrom, doc)
     sep = _separation(chrom, doc)
     return (1 + _sigmoid(coh)) ** sep
+
+
+def cohesion_separation(chrom, doc):
+    """Measure balancing both cohesion and separation of clusters."""
+    return _cohesion_separation(chrom, doc)
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
