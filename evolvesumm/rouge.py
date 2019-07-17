@@ -1,4 +1,14 @@
+import string
+
+from nltk.tokenize import word_tokenize
 from nltk.util import ngrams
+
+
+def _get_ngrams(text, n):
+    punctuation = set(string.punctuation)
+    no_punc = "".join(char for char in text.lower() if char not in punctuation)
+    words = word_tokenize(no_punc)
+    return set(ngrams(words, n))
 
 
 def rouge_n(n, extracted_summ, gold_summ):
@@ -9,8 +19,10 @@ def rouge_n(n, extracted_summ, gold_summ):
     This implementation is derived from:
     [1] C.Y. Lin "ROUGE: A Package for Automatic Evaluation of Summaries" 2004
     """
-    n_gram_pred = set(ngrams(extracted_summ, n))
-    n_gram_true = set(ngrams(gold_summ, n))
+    n_gram_pred = _get_ngrams(extracted_summ, n)
+    n_gram_true = _get_ngrams(gold_summ, n)
+    # n_gram_pred = set(ngrams(extracted_summ, n))
+    # n_gram_true = set(ngrams(gold_summ, n))
     return len(n_gram_pred & n_gram_true) / len(n_gram_true)
 
 
