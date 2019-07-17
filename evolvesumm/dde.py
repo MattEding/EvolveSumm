@@ -148,7 +148,7 @@ class DdeSummarizer:
         count_vec = CountVectorizer(stop_words=self.stop_words).fit_transform(self._tokens)
         #: numba does not support sparse matrices; dtype bool to emulate sets
         self._document = count_vec.toarray().astype(bool)
-        self._summ_len = int(self.summ_ratio * self._document.shape[1]) or 1
+        self._summ_len = int(self.summ_ratio * len(self._document)) or 1
 
     def summarize(self):
         """Create extractive summary using DDE."""
@@ -218,7 +218,8 @@ class DdeSummarizer:
     def _survival(self, pool):
         #: determine whether parents or offspring will survive to the next generation
         fits = pool.map(self.fitness, itertools.chain(self._pop, self._offspr))
-        self._best_fit = max(fits)  # used for early stopping
+        fits = np.array(fits)
+        self._best_fit = fits.max()  # used for early stopping
         i = len(self._pop)
         fit_pop, fit_off = fits[:i], fits[i:]
         mask = fit_off > fit_pop
