@@ -3,8 +3,8 @@ import itertools
 import logging
 import multiprocessing
 
-from nltk.tokenize import sent_tokenize
 import numpy as np
+from nltk.tokenize import sent_tokenize
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics import pairwise_distances
 

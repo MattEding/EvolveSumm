@@ -21,8 +21,6 @@ def rouge_n(n, extracted_summ, gold_summ):
     """
     n_gram_pred = _get_ngrams(extracted_summ, n)
     n_gram_true = _get_ngrams(gold_summ, n)
-    # n_gram_pred = set(ngrams(extracted_summ, n))
-    # n_gram_true = set(ngrams(gold_summ, n))
     return len(n_gram_pred & n_gram_true) / len(n_gram_true)
 
 
