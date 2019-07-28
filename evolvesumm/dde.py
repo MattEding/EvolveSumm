@@ -1,14 +1,13 @@
 import collections
 import itertools
 import logging
-import multiprocessing
 
-import numpy as np
 from nltk.tokenize import sent_tokenize
+import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics import pairwise_distances
 
-from .utils import jaccard, sigmoid, cohesion, separation, cohesion_separation
+from .utils import sigmoid, cohesion, separation, cohesion_separation
 
 
 class DdeSummarizer:
@@ -42,10 +41,6 @@ class DdeSummarizer:
         next generation. The 'coh' fitness maximizes similarity within a given
         cluster. The 'sep' fitness minimizes similarity between different
         clusters. The 'coh_sep' is a balance of the former two.
-
-    similarity : callable, (default=jaccard)
-        Similarity function for comparing two arrays. Needs to be able to work
-        with numba.
 
     metric : str, or callable, (default='cosine')
         Metric used to select central sentences from clusters when finished with
@@ -92,8 +87,8 @@ class DdeSummarizer:
         The actual number of iterations executed.
     """
 
-    def __init__(self, pop_size=100, max_iter=1000, summ_ratio=0.1, lam=0.5, crossover=0.5,
-                 fitness='coh_sep', similarity=jaccard, metric='cosine', tokenizer=sent_tokenize,
+    def __init__(self, pop_size=50, max_iter=100, summ_ratio=0.1, lam=0.5, crossover=0.5,
+                 fitness='coh_sep', metric='cosine', tokenizer=sent_tokenize,
                  stop_words=None, n_jobs=1, early_stopping=False, n_iter_no_change=5,
                  tol=1e-3, random_state=None, verbose=0):
 
@@ -127,31 +122,29 @@ class DdeSummarizer:
             raise ValueError('crossover not in interval [0, 1]')
         self.crossover = float(crossover)
 
-        #TODO: use inspect.signature to see if it takes 2 inputs?
-        if not callable(similarity):
-            raise ValueError('similarity must be callable')
-        self.similarity = similarity
 
     def __repr__(self):
         fitness = '_'.join(fit[:3] for fit in self.fitness.__name__.split('_') if fit)
         return (f'{type(self).__name__}(pop_size={self.pop_size}, max_iter={self.max_iter}, '
                 f'summ_ratio={self.summ_ratio}, lam={self.lam}, crossover={self.crossover}, '
-                f'fitness={fitness!r}, similarity={self.similarity.__name__}, metric={self.metric!r}, '
-                f'tokenizer={self.tokenizer.__name__}, stop_words={self.stop_words!r}, n_jobs={self.n_jobs}, '
+                f'fitness={fitness!r}, metric={self.metric!r}, tokenizer={self.tokenizer.__name__}, '
+                f'stop_words={self.stop_words!r}, n_jobs={self.n_jobs}, '
                 f'early_stopping={self.early_stopping}, n_iter_no_change={self.n_iter_no_change}, '
                 f'tol={self.tol}, random_state={self.random_state}, verbose={self.verbose})')
 
     def fit(self, text):
         """Fit text to model."""
+
         self.text = str(text)
         self._tokens = self.tokenizer(self.text.lower())
         count_vec = CountVectorizer(stop_words=self.stop_words).fit_transform(self._tokens)
         #: numba does not support sparse matrices; dtype bool to emulate sets
         self._document = count_vec.toarray().astype(bool)
-        self._summ_len = int(self.summ_ratio * len(self._document)) or 1
+        self._summ_len = int(self.summ_ratio * self._document.shape[1]) or 1
 
     def summarize(self):
         """Create extractive summary using DDE."""
+
         np.random.seed(self.random_state)
 
         if self.verbose:
@@ -162,15 +155,14 @@ class DdeSummarizer:
                 logging.debug('random state: {}'.format(np.random.get_state()))
 
         processes = self.n_jobs if (self.n_jobs >= 1) else None
-        pool = multiprocessing.Pool(processes)
         n_iter_deque = collections.deque([np.nan] * self.n_iter_no_change, maxlen=self.n_iter_no_change)
-        self._pop = np.array([self._init_chrom() for _ in range(self.pop_size)])
+        self._pop = np.array([self._initialize_chromosome() for _ in range(self.pop_size)])
 
         #: iterate through generations to approach optimal solution
         for i in range(self.max_iter):
             self._rand = np.random.random_sample(self._pop.shape)
-            self._offspring()
-            self._survival(pool)
+            self._create_offspring()
+            self._survival()
             self._mutate()
 
             if self.verbose:
@@ -184,13 +176,12 @@ class DdeSummarizer:
                 if max(n_iter_deque) - min(n_iter_deque) < self.tol:
                     break
 
-        pool.terminate()
         self.n_iter_ = i + 1
         idx = np.argmax([self.fitness(chrom) for chrom in self._pop])
         self.best_chrom_ = self._pop[idx]
-        self._build_summ()
+        self._build_summary()
 
-    def _init_chrom(self):
+    def _initialize_chromosome(self):
         #: make a chromosome that is a random partition with each cluster.
         clusters = np.arange(self._summ_len)
         chrom = np.full(len(self._document), -1)
@@ -202,38 +193,46 @@ class DdeSummarizer:
         chrom[idxs] = np.random.choice(clusters, np.sum(idxs))
         return chrom
 
-    def _offspring(self):
+    def _get_distinct_chromosomes(self):
         #: create offspring using parent population
         n = np.arange(len(self._pop))
         s = frozenset(n)
         #: get 3 distinct chromosomes that differ from i_th chromosome
         idxs = np.array([np.random.choice(tuple(s - {i}), size=3, replace=False) for i in n])
         chrom_1, chrom_2, chrom_3 = map(np.squeeze, np.split(self._pop[idxs], 3, axis=1))
+        return chrom_1, chrom_2, chrom_3
+
+    def _create_offspring(self):
+        chrom_1, chrom_2, chrom_3 = self._get_distinct_chromosomes()
         #: discrete differential evolution
-        self._offspr = (chrom_1 + self.lam * (chrom_2 - chrom_3)) % self._summ_len
+        self._offspr = ((chrom_1 + self.lam * (chrom_2 - chrom_3)) % self._summ_len)
         mask = self._rand < self.crossover
         self._offspr[mask] = self._pop[mask]
         return
 
-    def _survival(self, pool):
+    def _survival(self):
         #: determine whether parents or offspring will survive to the next generation
-        fits = pool.map(self.fitness, itertools.chain(self._pop, self._offspr))
-        fits = np.array(fits)
-        self._best_fit = fits.max()  # used for early stopping
+        fit_pop = self.fitness(self._pop)
+        fit_off = self.fitness(self._offspr)
+        self._best_fit = max(fit_pop.max(), fit_off.max())  # used for early stopping
         i = len(self._pop)
-        fit_pop, fit_off = fits[:i], fits[i:]
         mask = fit_off > fit_pop
         self._pop[mask] = self._offspr[mask]
         return
 
-    def _mutate(self):
-        mask = self._rand < sigmoid(self._pop)
+    @staticmethod
+    def _chromosomal_inversion(mask, pop):
         #: inversion operator -> for each row reverse order of all True values
         idxs = np.nonzero(mask)
         arr = np.array(idxs)
         sorter = np.lexsort((-arr[1], arr[0]))
         rev = arr.T[sorter].T
-        self._pop[idxs] = self._pop[(rev[0], rev[1])]
+        pop[idxs] = pop[(rev[0], rev[1])]
+        return pop
+
+    def _mutate(self):
+        mask = self._rand < sigmoid(self._pop)
+        self._pop = self._chromosomal_inversion(mask, self._pop)
         return
 
     def _central_tokens(self):
@@ -248,7 +247,7 @@ class DdeSummarizer:
             central_idxs.append(central_token)
         return sorted(central_idxs)
 
-    def _build_summ(self):
+    def _build_summary(self):
         #: build summary with preserved upper and lower case
         central = self._central_tokens()
         summ = []
@@ -260,10 +259,10 @@ class DdeSummarizer:
         return
 
     def _cohesion(self, chrom):
-        return cohesion(chrom, self._document, self.similarity)
+        return cohesion(chrom, self._document)
 
     def _separation(self, chrom):
-        return 1 / separation(chrom, self._document, self.similarity)
+        return 1 / separation(chrom, self._document)
 
     def _cohesion_separation(self, chrom):
-        return cohesion_separation(chrom, self._document, self.similarity)
+        return cohesion_separation(chrom, self._document)
