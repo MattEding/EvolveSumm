@@ -1,5 +1,4 @@
 import collections
-import itertools
 import logging
 
 from nltk.tokenize import sent_tokenize
