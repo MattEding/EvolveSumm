@@ -1,3 +1,8 @@
+jsons/
 __pycache__/
 .ipynb_checkpoints/
+.vscode/
+
 .DSstore
+demo.py
+article*
